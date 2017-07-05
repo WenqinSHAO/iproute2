@@ -32,6 +32,7 @@ enum {
 	IFA_CACHEINFO,
 	IFA_MULTICAST,
 	IFA_FLAGS,
+	IFA_PVD,
 	__IFA_MAX,
 };
 

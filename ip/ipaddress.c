@@ -1181,13 +1181,16 @@ int print_addrinfo(const struct sockaddr_nl *who, struct nlmsghdr *n,
 			fprintf(fp, "%usec", ci->ifa_valid);
 		fprintf(fp, " preferred_lft ");
 		if (ci->ifa_prefered == INFINITY_LIFE_TIME)
-			fprintf(fp, "forever");
+			fprintf(fp, "forever ");
 		else {
 			if (deprecated)
-				fprintf(fp, "%dsec", ci->ifa_prefered);
+				fprintf(fp, "%dsec ", ci->ifa_prefered);
 			else
-				fprintf(fp, "%usec", ci->ifa_prefered);
+				fprintf(fp, "%usec ", ci->ifa_prefered);
 		}
+	}
+	if (rta_tb[IFA_PVD]) {
+		fprintf(fp, "pvd %s ", (char *) RTA_DATA(rta_tb[IFA_PVD]));
 	}
 	fprintf(fp, "\n");
 brief_exit:
@@ -1860,7 +1863,7 @@ static int ipaddr_modify(int cmd, int flags, int argc, char **argv)
 	struct {
 		struct nlmsghdr	n;
 		struct ifaddrmsg	ifa;
-		char			buf[256];
+		char			buf[1024];
 	} req = {
 		.n.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg)),
 		.n.nlmsg_flags = NLM_F_REQUEST | flags,
@@ -1940,6 +1943,28 @@ static int ipaddr_modify(int cmd, int flags, int argc, char **argv)
 			NEXT_ARG();
 			l = *argv;
 			addattr_l(&req.n, sizeof(req), IFA_LABEL, l, strlen(l)+1);
+		} else if (strcmp(*argv, "pvd") == 0) {
+#ifndef	PVDNAMSIZ
+#define	PVDNAMSIZ	256
+#endif
+			char buf[1024];
+			struct rtattr *rta = (void *)buf;
+
+			rta->rta_type = IFA_PVD;
+			rta->rta_len = RTA_LENGTH(0);
+
+			NEXT_ARG();
+
+			if (strlen(*argv) >= PVDNAMSIZ) {
+				invarg("\"pvd\" value is invalid (too long name)\n",
+					*argv);
+			}
+
+			if (strlen(*argv) != 0) {
+				rta_addattr_l(rta, sizeof(buf), IFA_PVD, *argv, strlen(*argv));
+
+				addraw_l(&req.n, 1024, RTA_DATA(rta), RTA_PAYLOAD(rta));
+			}
 		} else if (matches(*argv, "valid_lft") == 0) {
 			if (valid_lftp)
 				duparg("valid_lft", *argv);

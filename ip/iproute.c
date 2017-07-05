@@ -31,6 +31,10 @@
 #include "ip_common.h"
 #include "iproute_lwtunnel.h"
 
+#ifndef	PVDNAMSIZ
+#define	PVDNAMSIZ	256
+#endif
+
 #ifndef RTAX_RTTVAR
 #define RTAX_RTTVAR RTAX_HOPS
 #endif
@@ -706,25 +710,30 @@ int print_route(const struct sockaddr_nl *who, struct nlmsghdr *n, void *arg)
 
 		switch (pref) {
 		case ICMPV6_ROUTER_PREF_LOW:
-			fprintf(fp, "low");
+			fprintf(fp, "low ");
 			break;
 		case ICMPV6_ROUTER_PREF_MEDIUM:
-			fprintf(fp, "medium");
+			fprintf(fp, "medium ");
 			break;
 		case ICMPV6_ROUTER_PREF_HIGH:
-			fprintf(fp, "high");
+			fprintf(fp, "high ");
 			break;
 		default:
-			fprintf(fp, "%u", pref);
+			fprintf(fp, "%u ", pref);
 		}
 	}
 	if (tb[RTA_TTL_PROPAGATE]) {
 		fprintf(fp, "ttl-propagate ");
 		if (rta_getattr_u8(tb[RTA_TTL_PROPAGATE]))
-			fprintf(fp, "enabled");
+			fprintf(fp, "enabled ");
 		else
-			fprintf(fp, "disabled");
+			fprintf(fp, "disabled ");
 	}
+
+	if (tb[RTA_PVD]) {
+		fprintf(fp, "pvd %s ", (char *) RTA_DATA(tb[RTA_PVD]));
+	}
+
 	fprintf(fp, "\n");
 	fflush(fp);
 	return 0;
@@ -1184,6 +1193,25 @@ static int iproute_modify(int cmd, unsigned int flags, int argc, char **argv)
 			else if (get_u8(&pref, *argv, 0))
 				invarg("\"pref\" value is invalid\n", *argv);
 			addattr8(&req.n, sizeof(req), RTA_PREF, pref);
+		} else if (strcmp(*argv, "pvd") == 0) {
+			char buf[1024];
+			struct rtattr *rta = (void *)buf;
+
+			rta->rta_type = RTA_PVD;
+			rta->rta_len = RTA_LENGTH(0);
+
+			NEXT_ARG();
+
+			if (strlen(*argv) >= PVDNAMSIZ) {
+				invarg("\"pvd\" value is invalid (too long name)\n",
+					*argv);
+			}
+
+			if (strlen(*argv) != 0) {
+				rta_addattr_l(rta, sizeof(buf), RTA_PVD, *argv, strlen(*argv));
+
+				addraw_l(&req.n, 1024, RTA_DATA(rta), RTA_PAYLOAD(rta));
+			}
 		} else if (strcmp(*argv, "encap") == 0) {
 			char buf[1024];
 			struct rtattr *rta = (void *)buf;
