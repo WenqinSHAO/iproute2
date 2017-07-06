@@ -6,6 +6,7 @@ Config
 *.so
 *~
 \#*#
+*.sw?
 
 # cscope
 cscope.*
